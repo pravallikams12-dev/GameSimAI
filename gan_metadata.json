@@ -1,0 +1,28 @@
+{
+  "archetype_names": [
+    "Aggressive Carry",
+    "Early Snowballer",
+    "Passive Farmer",
+    "Team Fighter",
+    "Vision Controller"
+  ],
+  "features": [
+    "kda",
+    "cspm",
+    "vision_per_min",
+    "dpm",
+    "early_gold_advantage",
+    "kill_participation",
+    "wardsplaced",
+    "is_carry",
+    "is_support",
+    "is_jungle"
+  ],
+  "noise_dim": 64,
+  "n_classes": 5,
+  "n_features": 10,
+  "epochs_trained": 2000,
+  "final_d_loss": 0.37385895438849354,
+  "final_g_loss": 2.010400609467357,
+  "synthetic_players_generated": 25000
+}

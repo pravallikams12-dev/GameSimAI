@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CHEKODI — GameSim AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:        #080d14;
+  --bg2:       #0d1520;
+  --bg3:       #111c2a;
+  --panel:     #0a1622;
+  --border:    #1a2d42;
+  --border2:   #243a52;
+  --teal:      #00e5cc;
+  --teal2:     #00bfaa;
+  --amber:     #f0a500;
+  --amber2:    #ffb833;
+  --red:       #ff3c5a;
+  --dim:       #4a6278;
+  --text:      #c8dce8;
+  --text2:     #8ba8bd;
+  --glow-t:    0 0 12px rgba(0,229,204,0.5);
+  --glow-a:    0 0 12px rgba(240,165,0,0.5);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-serif; }
+
+/* ── SCANLINE OVERLAY ── */
+body::before {
+  content:'';
+  position:fixed; inset:0; z-index:9999; pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);
+}
+
+/* ── LAYOUT ── */
+.shell {
+  display:grid;
+  grid-template-rows:48px 1fr 160px;
+  grid-template-columns:420px 1fr;
+  height:100vh;
+  gap:0;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  grid-column:1/-1;
+  display:flex; align-items:center; gap:16px;
+  padding:0 18px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  position:relative;
+}
+.topbar::after {
+  content:''; position:absolute; bottom:0; left:0; right:0;
+  height:1px; background:linear-gradient(90deg,transparent,var(--teal),transparent);
+  opacity:0.4;
+}
+.logo-hex {
+  width:30px; height:30px;
+  background:linear-gradient(135deg,var(--teal),var(--teal2));
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Orbitron',sans-serif; font-size:11px; font-weight:900;
+  color:var(--bg); flex-shrink:0;
+}
+.topbar-brand {
+  font-family:'Orbitron',sans-serif;
+  font-size:14px; font-weight:700; letter-spacing:3px;
+  color:var(--teal); text-shadow:var(--glow-t);
+}
+.topbar-sub { font-size:10px; color:var(--dim); letter-spacing:1px; margin-left:4px; }
+.topbar-spacer { flex:1; }
+.milestone-chips { display:flex; gap:8px; }
+.chip {
+  padding:3px 10px; font-size:9px; font-family:'Orbitron',sans-serif;
+  letter-spacing:1px; border-radius:2px;
+}
+.chip-done  { background:rgba(0,229,204,0.12); border:1px solid var(--teal2); color:var(--teal); }
+.chip-prog  { background:rgba(240,165,0,0.12);  border:1px solid var(--amber); color:var(--amber); }
+.chip-pend  { background:rgba(255,255,255,0.04); border:1px solid var(--border2); color:var(--dim); }
+.clock { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--dim); margin-left:12px; }
+
+/* ── LEFT PANEL — TERMINAL ── */
+.terminal {
+  grid-column:1; grid-row:2;
+  background:var(--panel);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.panel-header {
+  padding:8px 16px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  font-family:'Orbitron',sans-serif;
+  font-size:9px; letter-spacing:2px; color:var(--dim);
+  display:flex; align-items:center; gap:8px;
+}
+.panel-header .dot { width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:var(--glow-t); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.conv { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+.conv::-webkit-scrollbar { width:4px; }
+.conv::-webkit-scrollbar-track { background:transparent; }
+.conv::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+/* ── MESSAGES ── */
+.msg { display:flex; gap:10px; animation:fadeIn 0.3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.msg.user { flex-direction:row-reverse; }
+
+.avatar {
+  width:28px; height:28px; flex-shrink:0;
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Orbitron',sans-serif; font-size:8px; font-weight:700;
+}
+.avatar-ck { background:linear-gradient(135deg,var(--teal),var(--teal2)); color:var(--bg); }
+.avatar-u  { background:linear-gradient(135deg,var(--amber),var(--amber2)); color:var(--bg); }
+
+.bubble {
+  max-width:280px; padding:10px 13px;
+  font-size:13px; font-weight:500; line-height:1.5;
+  border-radius:2px;
+}
+.bubble-ck {
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-left:2px solid var(--teal);
+  color:var(--text);
+}
+.bubble-u {
+  background:rgba(240,165,0,0.08);
+  border:1px solid rgba(240,165,0,0.25);
+  border-right:2px solid var(--amber);
+  color:var(--text);
+  text-align:right;
+}
+.msg-time { font-size:9px; color:var(--dim); margin-top:4px; font-family:'Share Tech Mono',monospace; }
+
+/* Typing dots */
+.typing { display:flex; align-items:center; gap:4px; padding:4px 0; }
+.typing span {
+  width:5px; height:5px; border-radius:50%; background:var(--teal);
+  animation:blink 1.2s infinite;
+}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:0.2}50%{opacity:1}}
+
+/* ── RIGHT PANEL — INTEL ── */
+.intel {
+  grid-column:2; grid-row:2;
+  background:var(--bg2);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.intel-body { flex:1; overflow-y:auto; padding:20px; }
+.intel-body::-webkit-scrollbar { width:4px; }
+.intel-body::-webkit-scrollbar-thumb { background:var(--border2); }
+
+.intel-placeholder {
+  height:100%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; color:var(--dim);
+}
+.intel-placeholder .big-hex {
+  width:70px; height:70px;
+  clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  background:linear-gradient(135deg,rgba(0,229,204,0.08),rgba(0,229,204,0.02));
+  border:1px solid rgba(0,229,204,0.15);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Orbitron',sans-serif; font-size:18px; color:rgba(0,229,204,0.3);
+}
+.intel-placeholder p { font-size:11px; letter-spacing:2px; font-family:'Orbitron',sans-serif; }
+
+/* Charts, grids etc */
+.viz-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+.viz-card {
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-top:2px solid var(--teal);
+  padding:16px; border-radius:2px;
+}
+.viz-card h4 { font-family:'Orbitron',sans-serif; font-size:9px; letter-spacing:2px; color:var(--teal); margin-bottom:10px; }
+.viz-card .viz-value { font-size:28px; font-family:'Orbitron',sans-serif; color:var(--text); }
+.viz-card .viz-sub { font-size:11px; color:var(--dim); margin-top:4px; }
+.bar-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.bar-label { font-size:11px; color:var(--text2); width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar-track { flex:1; height:8px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:2px; transition:width 0.6s ease; }
+.bar-val { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--dim); width:36px; text-align:right; }
+
+/* ── BOTTOM — INPUT ZONE ── */
+.input-zone {
+  grid-column:1/-1;
+  background:var(--bg2);
+  border-top:1px solid var(--border);
+  display:flex; flex-direction:column; gap:0;
+  padding:14px 18px 16px;
+}
+
+/* LIVE TRANSCRIPT BOX */
+.transcript-box {
+  min-height:36px; max-height:60px;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-bottom:none;
+  padding:8px 14px;
+  font-family:'Share Tech Mono',monospace; font-size:12px;
+  color:var(--teal); letter-spacing:0.5px;
+  overflow-y:auto;
+  display:none;
+}
+.transcript-box.active { display:block; }
+.transcript-cursor { display:inline-block; width:8px; height:14px; background:var(--teal); vertical-align:middle; margin-left:2px; animation:blink-cur 0.7s infinite; }
+@keyframes blink-cur{0%,100%{opacity:1}50%{opacity:0}}
+
+/* INPUT ROW */
+.input-row {
+  display:flex; gap:10px; align-items:center;
+}
+.txt-in {
+  flex:1; height:42px; padding:0 16px;
+  background:var(--bg3); border:1px solid var(--border2);
+  color:var(--text); font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:500;
+  outline:none; border-radius:2px;
+  transition:border-color 0.2s;
+}
+.txt-in:focus { border-color:var(--teal); box-shadow:0 0 0 1px rgba(0,229,204,0.15); }
+.txt-in::placeholder { color:var(--dim); }
+
+.btn-mic {
+  width:42px; height:42px; flex-shrink:0;
+  background:var(--bg3); border:1px solid var(--border2);
+  color:var(--dim); cursor:pointer; border-radius:2px;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s; position:relative;
+}
+.btn-mic:hover { border-color:var(--teal); color:var(--teal); }
+.btn-mic.listening {
+  border-color:var(--teal); color:var(--teal); background:rgba(0,229,204,0.08);
+  box-shadow:var(--glow-t);
+  animation:mic-pulse 1.2s infinite;
+}
+@keyframes mic-pulse { 0%,100%{box-shadow:0 0 8px rgba(0,229,204,0.4)} 50%{box-shadow:0 0 18px rgba(0,229,204,0.8)} }
+
+.btn-send {
+  width:42px; height:42px; flex-shrink:0;
+  background:var(--teal); border:none; color:var(--bg);
+  cursor:pointer; border-radius:2px;
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.2s; font-size:16px;
+}
+.btn-send:hover { background:var(--teal2); box-shadow:var(--glow-t); }
+
+/* STATUS + QUICK COMMANDS */
+.bottom-row {
+  display:flex; align-items:center; gap:10px; margin-top:10px;
+}
+.voice-status {
+  font-family:'Share Tech Mono',monospace; font-size:10px;
+  min-width:160px; color:var(--dim);
+}
+.voice-status.on { color:var(--teal); }
+.voice-status.speaking { color:var(--amber); }
+
+.quick-cmds { display:flex; gap:6px; flex-wrap:wrap; }
+.qcmd {
+  padding:4px 12px; font-size:10px; font-family:'Orbitron',sans-serif;
+  letter-spacing:0.5px; background:transparent;
+  border:1px solid var(--border2); color:var(--dim);
+  cursor:pointer; border-radius:2px; transition:all 0.15s;
+}
+.qcmd:hover { border-color:var(--teal); color:var(--teal); background:rgba(0,229,204,0.05); }
+
+#debug-panel {
+  position: fixed;
+  bottom: 180px;
+  right: 16px;
+  width: 420px;
+  background: rgba(0,0,0,0.92);
+  border: 1px solid #00e5cc;
+  border-radius: 4px;
+  z-index: 9999;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+}
+#debug-header {
+  padding: 6px 12px;
+  background: rgba(0,229,204,0.1);
+  border-bottom: 1px solid #00e5cc;
+  color: #00e5cc;
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+}
+#debug-log {
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  color: #8ba8bd;
+  line-height: 1.6;
+}
+#debug-log div { border-bottom: 1px solid rgba(255,255,255,0.04); padding: 2px 0; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="logo-hex">CK</div>
+    <div>
+      <div class="topbar-brand">CHEKODI</div>
+    </div>
+    <div class="topbar-sub">GAMESIM AI · UNIVERSITY OF HOUSTON · MAY 2026</div>
+    <div class="topbar-spacer"></div>
+    <div class="milestone-chips">
+      <span class="chip chip-done">M1 ✓ EDA</span>
+      <span class="chip chip-prog">M2 ◑ ML</span>
+      <span class="chip chip-pend">M3 ○ GAN</span>
+    </div>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
+
+  <!-- TERMINAL (LEFT) -->
+  <section class="terminal">
+    <div class="panel-header">
+      <div class="dot"></div>
+      COMMAND // TERMINAL
+      <span style="margin-left:auto;font-size:9px" id="exchange-count">0 EXCHANGES</span>
+    </div>
+    <div class="conv" id="conv"></div>
+  </section>
+
+  <!-- INTEL (RIGHT) -->
+  <section class="intel">
+    <div class="panel-header">
+      <div class="dot" style="background:var(--amber);box-shadow:var(--glow-a)"></div>
+      INTEL // VISUAL ANALYSIS
+    </div>
+    <div class="intel-body" id="intel-body">
+      <div class="intel-placeholder" id="intel-placeholder">
+        <div class="big-hex">◈</div>
+        <p>AWAITING QUERY</p>
+        <p style="font-size:9px;opacity:0.5">ASK CHEKODI ANYTHING ABOUT GAMESIM AI</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- INPUT ZONE (BOTTOM, FULL WIDTH) -->
+  <div class="input-zone">
+    <!-- Live transcript appears here while speaking -->
+    <div class="transcript-box" id="transcript-box">
+      <span id="transcript-text"></span><span class="transcript-cursor"></span>
+    </div>
+
+    <div class="input-row">
+      <button class="btn-mic" id="btn-mic" onclick="toggleMic()" title="Hold to speak / click to toggle">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <input class="txt-in" id="txt-in" type="text" placeholder="Ask Chekodi anything about GameSim AI..."
+             autocomplete="off" onkeydown="if(event.key==='Enter')sendText()"/>
+      <button class="btn-send" onclick="sendText()" title="Send">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="bottom-row">
+      <div class="voice-status" id="voice-status">● Press mic to speak</div>
+      <div class="quick-cmds">
+        <button class="qcmd" onclick="q('Show me all player archetypes')">Archetypes</button>
+        <button class="qcmd" onclick="q('What is the pipeline status?')">Pipeline</button>
+        <button class="qcmd" onclick="q('Show me dataset size by year')">Dataset</button>
+        <button class="qcmd" onclick="q('Which archetype has the best win rate?')">Best archetype</button>
+        <button class="qcmd" onclick="q('Give me the key stats of this project')">Key stats</button>
+        <button class="qcmd" onclick="q('What is our vision controller finding?')">Vision profile</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- DEBUG PANEL -->
+<div id="debug-panel">
+  <div id="debug-header" onclick="document.getElementById('debug-log').style.display = document.getElementById('debug-log').style.display==='none'?'block':'block'">
+    <span>🎤 VOICE DEBUG</span>
+    <span id="debug-sr-support"></span>
+  </div>
+  <div id="debug-log"></div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════
+const history  = [];
+let exchanges  = 0;
+let recognition = null;
+let isListening = false;
+let isSpeaking  = false;
+let silenceTimer = null;
+let finalTranscript = '';
+let interimTranscript = '';
+let audioUnlocked = false;
+let pendingGreeting = null;
+
+// ── CHROME AUTOPLAY UNLOCK ──────────────────────────────────
+// Chrome blocks audio.play() unless triggered by a user gesture.
+// We unlock on the very first click/key anywhere on the page,
+// then play any pending greeting that was queued before unlock.
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  // Create + immediately suspend a silent AudioContext — this
+  // satisfies Chrome's "user gesture required" requirement.
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume().then(() => ctx.close());
+  } catch(e) {}
+  dbg('✓ Audio unlocked by user gesture');
+  // Play greeting if it was queued before unlock
+  if (pendingGreeting) {
+    const txt = pendingGreeting;
+    pendingGreeting = null;
+    speakOut(txt);
+  }
+}
+document.addEventListener('click',   unlockAudio, { once: false });
+document.addEventListener('keydown',  unlockAudio, { once: false });
+
+// ════════════════════════════════════════════════════════════
+//  CLOCK
+// ════════════════════════════════════════════════════════════
+function tick() {
+  document.getElementById('clock').textContent = new Date().toTimeString().slice(0,8);
+}
+setInterval(tick, 1000); tick();
+
+// ════════════════════════════════════════════════════════════
+//  SYSTEM PROMPT (baked in — no backend needed for UI demo)
+// ════════════════════════════════════════════════════════════
+const SYSTEM = `You are CHEKODI (Cognitive Heuristic Engine for Knowledge, Operation & Data Intelligence), the AI interface layer for GameSim AI — a PySpark-based synthetic player behavior engine built on 11 years of League of Legends esports data (100K+ matches, 2014–2026).
+
+PERSONALITY: FRIDAY from Iron Man. Confident, sharp, dry wit, occasionally "boss." Female. Short punchy sentences. 2-3 sentences max for spoken parts. You narrate stories — not spreadsheets.
+
+PROJECT FACTS:
+- 5 archetypes discovered: Vision Controller (58% WR), Team Fighter (54%), Passive Farmer (53%), Aggressive Carry (51%), Early Snowballer (49%)
+- Data: Oracle's Elixir, 13 Excel/CSV files, 2014–2026
+- Peak year: 2021 (9,200 matches — LoL esports golden era)
+- Tech stack: PySpark, Python, Scikit-learn, PyTorch, FastAPI, Streamlit, AWS S3, Delta Lake, Airflow
+- Medallion pipeline: Bronze → Silver → Gold
+- M1 complete: EDA + 10 visualizations + t-SNE clustering confirming archetypes
+- M2 in progress: Archetype Classifier + LSTM sequence model + Conditional GAN
+- Team lead: Srinija Pravallika Puranam (Pravs), Univ. of Houston
+
+RESPONSE FORMAT: Always respond with a JSON object ONLY — no markdown, no preamble. Schema:
+{
+  "spoken": "2-3 sentence Chekodi response in her voice",
+  "visual": {
+    "type": "bar_chart" | "archetype_grid" | "pipeline" | "stats_grid" | "none",
+    "title": "...",
+    "data": { ... }
+  }
+}
+
+For bar_chart: data = { labels: [...], values: [...], unit: "..." }
+For archetype_grid: data = { archetypes: [{name, winrate, traits:[], color}] }
+For pipeline: data = { stages: [{name, status:"done"|"active"|"pending", detail}] }
+For stats_grid: data = { cards: [{label, value, sub}] }
+For none: data = {}`;
+
+// ════════════════════════════════════════════════════════════
+//  VOICE RECOGNITION — ROCK SOLID
+// ════════════════════════════════════════════════════════════
+function toggleMic() {
+  if (isSpeaking) return; // don't start while Chekodi is talking
+  if (isListening) {
+    stopListening();
+  } else {
+    startListening();
+  }
+}
+
+function startListening() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    setStatus('⚠ Use Chrome or Edge for voice', '');
+    return;
+  }
+
+  // Clean up any existing instance
+  if (recognition) { try { recognition.abort(); } catch(e){} recognition = null; }
+
+  finalTranscript = '';
+  interimTranscript = '';
+
+  recognition = new SR();
+  recognition.continuous = false;      // Edge works much better with continuous=false
+  recognition.interimResults = true;
+  recognition.lang = 'en-US';
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    isListening = true;
+    document.getElementById('btn-mic').classList.add('listening');
+    showTranscriptBox(true);
+    setStatus('● LISTENING — speak now', 'on');
+    dbg('✓ recognition.onstart fired — mic is active');
+  };
+
+  recognition.onresult = (event) => {
+    let fin = '';
+    let intr = '';
+    for (let i = 0; i < event.results.length; i++) {
+      const res = event.results[i];
+      if (res.isFinal) {
+        fin += res[0].transcript + ' ';
+      } else {
+        intr += res[0].transcript;
+      }
+    }
+    finalTranscript = fin;
+    interimTranscript = intr;
+
+    const full = (finalTranscript + interimTranscript).trim();
+
+    dbg('onresult: fin="' + fin.trim() + '" intr="' + intr.trim() + '"');
+    // Show ONLY in transcript box — NEVER type into the input bar
+    document.getElementById('transcript-text').textContent = full;
+
+    // Auto-send as soon as we have a final result
+    if (fin.trim().length > 0) {
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        const msg = fin.trim();
+        if (msg) {
+          document.getElementById('transcript-text').textContent = '';
+          finalTranscript = '';
+          interimTranscript = '';
+          stopListening();
+          sendMessage(msg);
+        }
+      }, 900);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    dbg('✗ recognition.onerror: ' + e.error);
+    console.error('Speech recognition error:', e.error);
+    if (e.error === 'not-allowed') {
+      setStatus('⚠ Mic permission denied — allow in browser settings', '');
+      stopListening();
+      return;
+    }
+    if (e.error === 'no-speech') {
+      // Restart quietly on no-speech
+      if (isListening) {
+        try { recognition.start(); } catch(err) {}
+      }
+      return;
+    }
+    if (e.error === 'network') {
+      setStatus('⚠ Network error — check connection', '');
+      stopListening();
+      return;
+    }
+    if (isListening) {
+      setTimeout(() => { if (isListening) restartListening(); }, 300);
+    }
+  };
+
+  recognition.onend = () => {
+    dbg('recognition.onend — isListening=' + isListening + ' finalTranscript="' + finalTranscript.trim() + '"');
+    // With continuous=false, onend fires after each phrase
+    if (isListening && finalTranscript.trim().length === 0) {
+      setTimeout(() => {
+        if (isListening) {
+          dbg('restarting after onend (no transcript yet)');
+          try { recognition.start(); } catch(e) { restartListening(); }
+        }
+      }, 100);
+    } else if (!isListening) {
+      document.getElementById('btn-mic').classList.remove('listening');
+    }
+  };
+
+  try {
+    recognition.start();
+  } catch(e) {
+    console.error('Could not start recognition:', e);
+    setStatus('⚠ Could not start mic — try refreshing', '');
+    isListening = false;
+  }
+}
+
+function restartListening() {
+  // Brief delay then restart — handles the "recognition ended unexpectedly" case
+  if (!isListening) return;
+  setTimeout(() => {
+    if (!isListening) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    try {
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognition.onresult = recognition.onerror = recognition.onend = null;
+
+      // Reattach handlers
+      recognition.onresult = (event) => {
+        let fin = '', intr = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const res = event.results[i];
+          if (res.isFinal) fin += res[0].transcript + ' ';
+          else intr += res[0].transcript;
+        }
+        finalTranscript = fin;
+        interimTranscript = intr;
+        const full = (finalTranscript + interimTranscript).trim();
+        document.getElementById('transcript-text').textContent = full;
+        // never touch txt-in
+        clearTimeout(silenceTimer);
+        if (fin.trim().length > 0) {
+          silenceTimer = setTimeout(() => {
+            const msg = fin.trim();
+            if (msg) {
+              document.getElementById('transcript-text').textContent = '';
+              finalTranscript = ''; interimTranscript = '';
+              stopListening(); sendMessage(msg);
+            }
+          }, 900);
+        }
+      };
+      recognition.onerror = (e) => {
+        if (e.error !== 'no-speech' && e.error !== 'aborted') {
+          if (isListening) setTimeout(restartListening, 500);
+        }
+      };
+      recognition.onend = () => {
+        if (isListening) restartListening();
+        else document.getElementById('btn-mic').classList.remove('listening');
+      };
+      recognition.start();
+    } catch(e) {}
+  }, 300);
+}
+
+function stopListening() {
+  isListening = false;
+  clearTimeout(silenceTimer);
+  if (recognition) { try { recognition.abort(); } catch(e){} recognition = null; }
+  document.getElementById('btn-mic').classList.remove('listening');
+  setStatus('● Press mic to speak', '');
+  showTranscriptBox(false);
+}
+
+function showTranscriptBox(show) {
+  const box = document.getElementById('transcript-box');
+  if (show) {
+    box.classList.add('active');
+    document.getElementById('transcript-text').textContent = '';
+  } else {
+    box.classList.remove('active');
+    document.getElementById('transcript-text').textContent = '';
+  }
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('voice-status');
+  el.textContent = text;
+  el.className = 'voice-status' + (cls ? ' ' + cls : '');
+}
+
+// ════════════════════════════════════════════════════════════
+//  TEXT SEND (from input box or quick commands)
+// ════════════════════════════════════════════════════════════
+function sendText() {
+  const inp = document.getElementById('txt-in');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  sendMessage(msg);
+}
+
+function q(text) {
+  document.getElementById('txt-in').value = text;
+  sendText();
+}
+
+// ════════════════════════════════════════════════════════════
+//  CORE SEND & RECEIVE
+// ════════════════════════════════════════════════════════════
+async function sendMessage(text) {
+  if (!text) return;
+
+  appendMsg('user', text);
+  history.push({ role: 'user', content: text });
+  exchanges++;
+  document.getElementById('exchange-count').textContent = exchanges + ' EXCHANGE' + (exchanges !== 1 ? 'S' : '');
+
+  const typingId = showTyping();
+
+  try {
+    // Route through chekodi.py — keeps ElevenLabs, API key, system prompt all server-side
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history: history.slice(0, -1) })
+    });
+
+    const data = await res.json();
+    removeTyping(typingId);
+
+    if (data.error) {
+      const errMsg = 'Error — ' + data.error;
+      appendMsg('chekodi', errMsg);
+      history.push({ role: 'assistant', content: errMsg });
+      return;
+    }
+
+    const reply = data.reply || '';
+    let spoken = reply;
+    let visual = { type: 'none' };
+
+    // Try parse JSON response (Chekodi returns structured JSON)
+    try {
+      const clean = reply.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      spoken = parsed.spoken || spoken;
+      visual = parsed.visual || visual;
+    } catch(e) {
+      // Plain text reply — use as-is
+    }
+
+    appendMsg('chekodi', spoken);
+    history.push({ role: 'assistant', content: reply });
+    renderVisual(visual);
+    speakOut(spoken);
+
+  } catch(e) {
+    removeTyping(typingId);
+    const errMsg = 'Backend offline — make sure chekodi.py is running on port 5000.';
+    appendMsg('chekodi', errMsg);
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  SPEECH OUTPUT — ElevenLabs via chekodi.py /speak endpoint
+//  Mic is stopped before audio plays, only restarts after audio ends
+// ════════════════════════════════════════════════════════════
+let currentAudio = null;
+
+async function speakOut(text) {
+  // If Chrome hasn't been unlocked by a user gesture yet, queue and wait
+  if (!audioUnlocked) {
+    dbg('⏳ Audio not yet unlocked — queuing greeting for first click');
+    pendingGreeting = text;
+    setStatus('▶ Click anywhere to hear Chekodi', 'speaking');
+    return;
+  }
+
+  // Kill any currently playing audio
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.src = '';
+    currentAudio = null;
+  }
+
+  // STOP mic BEFORE speaking — prevents Chekodi hearing herself
+  stopListening();
+  isSpeaking = true;
+  setStatus('◉ CHEKODI speaking...', 'speaking');
+  dbg('⏳ Fetching TTS from /speak...');
+
+  try {
+    const res = await fetch('/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+
+    if (!res.ok) {
+      dbg('✗ ElevenLabs /speak returned ' + res.status + ' — falling back to browser TTS');
+      fallbackTTS(text);
+      return;
+    }
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+    dbg('✓ ElevenLabs audio blob received — playing');
+
+    const onDone = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      isSpeaking = false;
+      setStatus('● Press mic to speak', '');
+      setTimeout(() => {
+        if (!isSpeaking && !isListening) startListening();
+      }, 600);
+    };
+
+    audio.onended = onDone;
+    audio.onerror = (e) => {
+      dbg('✗ Audio playback error: ' + e);
+      onDone();
+    };
+
+    // play() returns a Promise — catch NotAllowedError explicitly
+    audio.play().catch(err => {
+      dbg('✗ audio.play() blocked: ' + err.name + ' — falling back to browser TTS');
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      fallbackTTS(text);
+    });
+
+  } catch(e) {
+    dbg('✗ ElevenLabs fetch failed: ' + e.message + ' — falling back to browser TTS');
+    fallbackTTS(text);
+  }
+}
+
+function fallbackTTS(text) {
+  isSpeaking = false;
+  setStatus('● Press mic to speak', '');
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.rate = 0.95; utter.pitch = 1.05;
+  // Pick best available voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v => v.name.includes('Aria') || v.name.includes('Zira') || v.name.includes('Google US English Female'));
+  if (preferred) utter.voice = preferred;
+  utter.onend = () => {
+    setStatus('● Press mic to speak', '');
+    setTimeout(() => { if (!isSpeaking && !isListening) startListening(); }, 600);
+  };
+  window.speechSynthesis.speak(utter);
+  dbg('✓ Browser TTS fallback speaking');
+}
+
+// ════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════════════════
+function appendMsg(role, text) {
+  const conv = document.getElementById('conv');
+  const isChekodi = role === 'chekodi';
+  const time = new Date().toTimeString().slice(0,5);
+
+  const div = document.createElement('div');
+  div.className = 'msg ' + (isChekodi ? '' : 'user');
+  div.innerHTML = `
+    <div class="avatar ${isChekodi ? 'avatar-ck' : 'avatar-u'}">${isChekodi ? 'CK' : 'U'}</div>
+    <div>
+      <div class="bubble ${isChekodi ? 'bubble-ck' : 'bubble-u'}">${escHtml(text)}</div>
+      <div class="msg-time">${time}</div>
+    </div>`;
+  conv.appendChild(div);
+  conv.scrollTop = conv.scrollHeight;
+}
+
+let typingCounter = 0;
+function showTyping() {
+  const id = 'typing-' + (++typingCounter);
+  const conv = document.getElementById('conv');
+  const div = document.createElement('div');
+  div.className = 'msg'; div.id = id;
+  div.innerHTML = `
+    <div class="avatar avatar-ck">CK</div>
+    <div><div class="bubble bubble-ck"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
+  conv.appendChild(div);
+  conv.scrollTop = conv.scrollHeight;
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ════════════════════════════════════════════════════════════
+//  VISUAL RENDERING
+// ════════════════════════════════════════════════════════════
+function renderVisual(visual) {
+  const body = document.getElementById('intel-body');
+  const ph = document.getElementById('intel-placeholder');
+  if (!visual || visual.type === 'none') return;
+  if (ph) ph.style.display = 'none';
+
+  let html = '';
+
+  if (visual.type === 'bar_chart') {
+    const { title, data } = visual;
+    const max = Math.max(...(data.values || [1]));
+    const colors = ['var(--teal)','var(--amber)','#7c6eff','#ff6b9d','#4ecdc4'];
+    html = `<div style="margin-bottom:20px">
+      <div style="font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:2px;color:var(--teal);margin-bottom:16px">${escHtml(title||'')}</div>
+      ${(data.labels||[]).map((label,i) => `
+        <div class="bar-row">
+          <div class="bar-label">${escHtml(label)}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(data.values[i]/max*100).toFixed(1)}%;background:${colors[i%colors.length]}"></div>
+          </div>
+          <div class="bar-val">${data.values[i]}${data.unit?data.unit.replace('% win rate','%').replace('%',''):''}</div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  else if (visual.type === 'archetype_grid') {
+    const archetypes = visual.data?.archetypes || defaultArchetypes();
+    html = `<div style="font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:2px;color:var(--teal);margin-bottom:16px">${escHtml(visual.title||'PLAYER ARCHETYPES')}</div>
+    <div class="viz-grid">
+      ${archetypes.map(a => `
+        <div class="viz-card" style="border-top-color:${a.color||'var(--teal)'}">
+          <h4>${escHtml(a.name)}</h4>
+          <div class="viz-value" style="color:${a.color||'var(--teal)'};">${a.winrate}%</div>
+          <div class="viz-sub">WIN RATE</div>
+          <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px">
+            ${(a.traits||[]).map(t=>`<span style="font-size:10px;padding:2px 7px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);border-radius:2px;color:var(--text2)">${escHtml(t)}</span>`).join('')}
+          </div>
+          <div style="margin-top:10px;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
+            <div style="height:100%;width:${a.winrate}%;background:${a.color||'var(--teal)'}"></div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  else if (visual.type === 'pipeline') {
+    const stages = visual.data?.stages || defaultPipeline();
+    html = `<div style="font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:2px;color:var(--teal);margin-bottom:20px">${escHtml(visual.title||'PIPELINE STATUS')}</div>
+    ${stages.map((s,i) => {
+      const clr = s.status==='done' ? 'var(--teal)' : s.status==='active' ? 'var(--amber)' : 'var(--border2)';
+      const icon = s.status==='done' ? '✓' : s.status==='active' ? '◑' : '○';
+      return `<div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:16px">
+        <div style="width:28px;height:28px;border:2px solid ${clr};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:${clr};flex-shrink:0;${s.status==='active'?'box-shadow:0 0 8px rgba(240,165,0,0.5)':''}">${icon}</div>
+        <div>
+          <div style="font-family:Orbitron,sans-serif;font-size:10px;color:${clr};letter-spacing:1px">${escHtml(s.name)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:3px">${escHtml(s.detail||'')}</div>
+        </div>
+      </div>
+      ${i < stages.length-1 ? `<div style="width:1px;height:12px;background:var(--border2);margin-left:13px;margin-bottom:4px"></div>` : ''}`;
+    }).join('')}`;
+  }
+
+  else if (visual.type === 'stats_grid') {
+    const cards = visual.data?.cards || [];
+    html = `<div style="font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:2px;color:var(--teal);margin-bottom:16px">${escHtml(visual.title||'KEY STATS')}</div>
+    <div class="viz-grid">
+      ${cards.map((c,i) => {
+        const accents = ['var(--teal)','var(--amber)','#7c6eff','#ff6b9d'];
+        return `<div class="viz-card" style="border-top-color:${accents[i%accents.length]}">
+          <h4>${escHtml(c.label)}</h4>
+          <div class="viz-value">${escHtml(String(c.value))}</div>
+          <div class="viz-sub">${escHtml(c.sub||'')}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  if (html) {
+    // Append to intel body (keep previous visuals)
+    const section = document.createElement('div');
+    section.style.cssText = 'margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border)';
+    section.innerHTML = html;
+    body.insertBefore(section, body.firstChild);
+    body.scrollTop = 0;
+  }
+}
+
+function defaultArchetypes() {
+  return [
+    {name:'Vision Controller', winrate:58, color:'#00e5cc', traits:['Ward-focused','Macro','Low deaths']},
+    {name:'Team Fighter',      winrate:54, color:'#f0a500', traits:['High assists','AoE damage','Engage']},
+    {name:'Passive Farmer',    winrate:53, color:'#7c6eff', traits:['High CS','Farm-first','Safe play']},
+    {name:'Aggressive Carry',  winrate:51, color:'#ff6b9d', traits:['High kills','Snowballer','High DMG']},
+    {name:'Early Snowballer',  winrate:49, color:'#4ecdc4', traits:['Early game','Objective control','Risky']},
+  ];
+}
+
+function defaultPipeline() {
+  return [
+    {name:'BRONZE LAYER — RAW INGESTION', status:'done', detail:'13 Excel/CSV files, 2014–2026, Oracle Elixir'},
+    {name:'SILVER LAYER — FEATURE ENGINEERING', status:'done', detail:'22 behavioral features, normalization, archetype labels'},
+    {name:'GOLD LAYER — ML MODELS', status:'active', detail:'Archetype Classifier + LSTM Sequence Model'},
+    {name:'SYNTHETIC GENERATION — GAN', status:'pending', detail:'Conditional GAN for synthetic player session generation'},
+    {name:'DEPLOYMENT — STREAMLIT + FASTAPI', status:'pending', detail:'Live dashboard + REST API endpoint'},
+  ];
+}
+
+// ════════════════════════════════════════════════════════════
+//  DEBUG LOGGER
+// ════════════════════════════════════════════════════════════
+function dbg(msg) {
+  const box = document.getElementById('debug-log');
+  if (!box) return;
+  const line = document.createElement('div');
+  line.textContent = new Date().toTimeString().slice(0,8) + '  ' + msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  console.log('[CHEKODI]', msg);
+}
+
+// ════════════════════════════════════════════════════════════
+//  BOOT GREETING
+// ════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  // Check SR support and show in debug
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const srEl = document.getElementById('debug-sr-support');
+  if (SR) {
+    if (srEl) srEl.textContent = '✓ SR supported';
+    dbg('✓ SpeechRecognition API available');
+  } else {
+    if (srEl) srEl.textContent = '✗ NO SR SUPPORT';
+    dbg('✗ SpeechRecognition NOT available in this browser');
+  }
+
+  setTimeout(() => {
+    const greeting = "Good to go, boss. GameSim AI is fully loaded — 11 years of League data, three milestones shipped. What do you want to know?";
+    appendMsg('chekodi', greeting);
+    history.push({ role: 'assistant', content: greeting });
+    // Queue greeting — speakOut will play it on first user gesture (Chrome autoplay policy)
+    pendingGreeting = greeting;
+    setStatus('▶ Click anywhere to hear Chekodi', 'speaking');
+    dbg('⏳ Greeting queued — waiting for first user gesture to unlock audio');
+  }, 600);
+});
+</script>
+</body>
+</html>
